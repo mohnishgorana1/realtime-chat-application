@@ -1,5 +1,5 @@
 "use client";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import Link from "next/link";
 import {
@@ -28,21 +28,23 @@ const Navbar = () => {
   const { appUser, loading } = useAppUser();
 
   return (
-    <nav className="sticky top-4 z-50 bg-background/80 backdrop-blur-xl px-4 py-2 mx-4 rounded-3xl border border-border shadow-lg transition-colors duration-300">
-      <div className="max-w-7xl mx-auto flex justify-between items-center h-14">
-        
-        {/* Logo Section */}
-        <Link href="/" className="group flex items-center gap-2">
-          <div className="bg-primary p-2 rounded-xl text-primary-foreground shadow-lg shadow-primary/20 transition-transform active:scale-95">
-            <MessageSquare size={18} fill="currentColor" />
-          </div>
-          <span className="text-lg font-bold tracking-tight text-foreground hidden sm:block">
-            ChatApp<span className="text-primary">.</span>
-          </span>
-        </Link>
+    <nav className="sticky top-4 z-50 bg-background/80 backdrop-blur-xl px-4 py-2 mx-4 rounded-3xl border border-border shadow-lg transition-all duration-300">
+      {/* Container: Flexbox used for perfect 3-section alignment */}
+      <div className="max-w-7xl mx-auto flex items-center justify-between h-14 relative">
+        {/* LEFT SECTION: Logo */}
+        <div className="flex-1 flex justify-start">
+          <Link href="/" className="group flex items-center gap-2">
+            <div className="bg-primary p-2 rounded-xl text-primary-foreground shadow-lg shadow-primary/20 transition-transform active:scale-95">
+              <MessageSquare size={18} fill="currentColor" />
+            </div>
+            <span className="text-lg font-bold tracking-tight text-foreground hidden lg:block">
+              ChatApp<span className="text-primary">.</span>
+            </span>
+          </Link>
+        </div>
 
-        {/* Desktop Navigation */}
-        <div className="hidden md:flex items-center bg-secondary/50 p-1 rounded-2xl border border-border/50">
+        {/* CENTER SECTION: Navigation (Desktop Only) */}
+        <div className="hidden md:flex items-center bg-secondary/40 p-1 rounded-2xl border border-border/50 backdrop-blur-md">
           {navItems.map((item, idx) => {
             const Icon = item.icon;
             return (
@@ -59,6 +61,7 @@ const Navbar = () => {
                     className="absolute inset-0 bg-accent rounded-xl"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
                   />
                 )}
@@ -69,16 +72,14 @@ const Navbar = () => {
           })}
         </div>
 
-        {/* Right Side Actions */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="mr-1">
-            <ThemeToggle />
-          </div>
+        {/* RIGHT SECTION: Actions */}
+        <div className="flex-1 flex items-center justify-end gap-2 sm:gap-3">
+          <ThemeToggle />
 
           <SignedIn>
-            <button className="p-2 hover:bg-secondary rounded-xl transition-colors relative text-muted-foreground hover:text-foreground">
+            <button className="hidden sm:block p-2 hover:bg-secondary rounded-xl transition-colors relative text-muted-foreground hover:text-foreground">
               <Bell size={20} />
-              <span className="absolute top-2 right-2.5 w-2 h-2 bg-primary rounded-full border-2 border-background"></span>
+              <span className="absolute top-2 right-2.5 w-2 h-2 bg-primary rounded-full border border-background"></span>
             </button>
           </SignedIn>
 
@@ -89,8 +90,7 @@ const Navbar = () => {
             <BsGithub size={20} />
           </Link>
 
-          {/* CLERK AUTH BUTTONS */}
-          <div className="flex items-center pl-2 border-l border-border ml-1">
+          <div className="flex items-center pl-2 border-l border-border/50 ml-1 gap-3">
             <SignedOut>
               <Link
                 href="/sign-in"
@@ -102,18 +102,18 @@ const Navbar = () => {
             </SignedOut>
 
             <SignedIn>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 {appUser && !loading && (
-                  <span className="hidden lg:block text-xs font-medium text-muted-foreground">
-                    {appUser.name}
+                  <span className="hidden xl:block text-xs font-semibold text-muted-foreground truncate max-w-[100px]">
+                    {appUser.name.split(" ")[0]}
                   </span>
                 )}
                 <UserButton
                   afterSignOutUrl="/"
                   appearance={{
                     elements: {
-                      userButtonAvatarBox: "h-9 w-9 rounded-xl border border-border overflow-hidden",
-                      userButtonPopoverCard: "bg-popover border border-border text-popover-foreground",
+                      userButtonAvatarBox:
+                        "h-9 w-9 rounded-xl border border-border shadow-sm",
                     },
                   }}
                 />
@@ -121,40 +121,44 @@ const Navbar = () => {
             </SignedIn>
           </div>
 
-          {/* Mobile Menu Toggle */}
+          {/* Mobile Toggle */}
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="md:hidden p-2 text-muted-foreground hover:text-foreground transition-colors"
+            className="md:hidden p-2 text-muted-foreground hover:text-foreground transition-colors ml-1"
           >
             {isOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
       </div>
 
-      {/* Mobile Menu (Animated) */}
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="md:hidden absolute top-20 left-0 w-full bg-popover border border-border rounded-3xl p-4 space-y-2 shadow-2xl mx-4"
-          style={{ width: 'calc(100% - 32px)' }} // Adjust for margins
-        >
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                onClick={() => setIsOpen(false)}
-                className="flex items-center gap-3 p-4 rounded-2xl hover:bg-accent transition-colors text-foreground"
-              >
-                <Icon size={20} className="text-primary" />
-                <span className="font-semibold">{item.name}</span>
-              </Link>
-            );
-          })}
-        </motion.div>
-      )}
+      {/* MOBILE MENU */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="md:hidden overflow-hidden bg-popover/95 border-t border-border mt-2 rounded-2xl shadow-xl"
+          >
+            <div className="p-4 space-y-1">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    onClick={() => setIsOpen(false)}
+                    className="flex items-center gap-3 p-3 rounded-xl hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+                  >
+                    <Icon size={18} className="text-primary" />
+                    <span className="font-medium text-sm">{item.name}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </nav>
   );
 };
