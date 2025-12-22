@@ -12,6 +12,7 @@ import {
 import { useAppUser } from "@/context/UserContext";
 import Image from "next/image";
 import axios from "axios";
+import { pusherClient } from "@/lib/pusherClient";
 
 // --- Sub-Component: Chat Header ---
 const ChatHeader = ({
@@ -23,7 +24,6 @@ const ChatHeader = ({
 }) => (
   <header className="h-16 border-b border-border flex items-center justify-between px-4 md:px-6 bg-background/50 backdrop-blur-md sticky top-0 z-10">
     <div className="flex items-center gap-2 md:gap-4">
-      {/* BACK BUTTON: Sirf mobile par dikhega aur layout ka part hoga */}
       <button
         onClick={onBack}
         className="md:hidden p-2 -ml-2 hover:bg-secondary rounded-full transition-colors"
@@ -85,21 +85,20 @@ export default function ChatView({
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Samne wale user ka data nikalna
   const otherUser = activeChat?.participants?.find(
     (p: any) => p._id !== appUser?._id
   );
 
-  // 1. Fetch Messages from API
+  // 1. Fetch Messages from API (Initial Load)
   useEffect(() => {
     const fetchMessages = async () => {
       if (!activeChat?._id) return;
       setLoading(true);
-      console.log("Fetching messages for chat:", activeChat._id);
       try {
         const res = await axios.get(`/api/messages/${activeChat._id}`);
         if (res.data.success) {
-          setMessages(res.data.data);
+          // Check if response is res.data.data or res.data.messages based on your API
+          setMessages(res.data.data || []);
         }
       } catch (error) {
         console.error("Fetch error:", error);
@@ -110,12 +109,34 @@ export default function ChatView({
     fetchMessages();
   }, [activeChat?._id]);
 
-  // 2. Auto-scroll to bottom
+  // 2. Pusher Real-time Listener
+  useEffect(() => {
+    if (!activeChat?._id) return;
+
+    const channelName = `chat-${activeChat._id}`;
+    const channel = pusherClient.subscribe(channelName);
+
+    channel.bind("incoming-message", (incomingMsg: any) => {
+      setMessages((prev) => {
+        // Prevent duplicate if the message is already in the state (sent by current user)
+        const exists = prev.find((m) => m._id === incomingMsg._id);
+        if (exists) return prev;
+        return [...prev, incomingMsg];
+      });
+    });
+
+    return () => {
+      pusherClient.unsubscribe(channelName);
+      channel.unbind("incoming-message");
+    };
+  }, [activeChat?._id]);
+
+  // 3. Auto-scroll to bottom
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // 3. Send Message Logic
+  // 4. Send Message Logic
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !activeChat?._id) return;
 
@@ -126,10 +147,16 @@ export default function ChatView({
     };
 
     try {
-      setNewMessage(""); // Clear input immediately
+      setNewMessage(""); // Optimistic UI clear
       const res = await axios.post("/api/messages/send", messageData);
+      
       if (res.data.success) {
-        setMessages((prev) => [...prev, res.data.data]);
+        const sentMsg = res.data.data || res.data.message;
+        setMessages((prev) => {
+           const exists = prev.find((m) => m._id === sentMsg._id);
+           if (exists) return prev;
+           return [...prev, sentMsg];
+        });
       }
     } catch (error) {
       console.error("Send error:", error);
@@ -140,9 +167,9 @@ export default function ChatView({
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground gap-4 bg-secondary/10">
         <div className="w-20 h-20 rounded-full bg-background flex items-center justify-center shadow-inner">
-          <Send size={32} className="opacity-10" />
+          <Send size={32} className="opacity-10 rotate-12" />
         </div>
-        <p className="text-sm font-medium opacity-50">
+        <p className="text-sm font-medium opacity-50 uppercase tracking-widest">
           Select a chat to start messaging
         </p>
       </div>
@@ -150,8 +177,7 @@ export default function ChatView({
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden gap-x-2">
-      {/* onBack pass kar rahe hain header ko */}
+    <div className="flex-1 flex flex-col h-full overflow-hidden">
       <ChatHeader otherUser={otherUser} onBack={onBack} />
 
       {/* Messages Area */}
@@ -162,8 +188,8 @@ export default function ChatView({
           </div>
         ) : (
           messages.map((msg, index) => {
-            const isMe =
-              msg.sender._id === appUser?._id || msg.sender === appUser?._id;
+            const isMe = msg.sender._id === appUser?._id || msg.sender === appUser?._id;
+            
             return (
               <div
                 key={msg._id || index}
@@ -209,8 +235,7 @@ export default function ChatView({
         <div ref={scrollRef} />
       </div>
 
-      {/* MEssage input */}
-
+      {/* Message input */}
       <div className="p-4 border-t border-border bg-background">
         <div className="max-w-4xl mx-auto flex items-end gap-2 bg-secondary/50 p-2 rounded-2xl border border-border focus-within:border-primary transition-all">
           <button className="p-2 hover:text-primary transition-colors text-muted-foreground">

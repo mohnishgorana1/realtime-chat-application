@@ -16,7 +16,7 @@ export default function MessagesSidebar({
       `/api/chats?userId=${appUser?._id}&isGroup=${false}`
     );
     if (response.data.success) {
-      setAllChats(response.data.chats);
+      setAllChats(response.data.data);
     }
   };
   // Samne wale user ka data nikalne ke liye helper

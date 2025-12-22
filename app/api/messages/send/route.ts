@@ -2,6 +2,7 @@ import connectDB from "@/lib/config/db";
 import { Message } from "@/models/message.model";
 import { Chat } from "@/models/chat.model";
 import { NextResponse } from "next/server";
+import { pusherServer } from "@/lib/pusherServer";
 
 export async function POST(req: Request) {
   try {
@@ -30,6 +31,12 @@ export async function POST(req: Request) {
 
     // 3. Sender ki details populate karke bhejien (frontend UI ke liye)
     const populatedMessage = await newMessage.populate("sender", "name avatar");
+
+    // * Pusher Trigger:
+    // 1. Channel Name: Chat ID (Unique for this conversation)
+    // 2. Event Name: "incoming-message"
+    // 3. Data: Naya message object
+    await pusherServer.trigger(`chat-${chatId}`, "incoming-message", populatedMessage);
 
     return NextResponse.json(
       {
