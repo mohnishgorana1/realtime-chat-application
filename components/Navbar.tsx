@@ -28,7 +28,7 @@ const Navbar = () => {
   const { appUser, loading } = useAppUser();
 
   return (
-    <nav className="sticky top-4 z-50 bg-background/80 backdrop-blur-xl px-4 py-2 mx-4 rounded-3xl border border-border shadow-lg transition-all duration-300">
+    <nav className="sticky top-4 z-50 bg-background/80 backdrop-blur-xl px-4 py-2 mx-2 md:mx-4 rounded-3xl border border-border shadow-lg transition-all duration-300">
       {/* Container: Flexbox used for perfect 3-section alignment */}
       <div className="max-w-7xl mx-auto flex items-center justify-between h-14 relative">
         {/* LEFT SECTION: Logo */}
