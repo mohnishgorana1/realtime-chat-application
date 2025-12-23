@@ -25,6 +25,19 @@ export default function MessagesSidebar({
     return participants.find((p) => p._id !== appUser?._id);
   };
 
+  const isChatUnread = (chat: any) => {
+    if (!chat.latestMessage) return false;
+    // Agar main sender hoon, to unread nahi ho sakta (maine hi bheja hai)
+    if (
+      chat.latestMessage.sender?._id === appUser?._id ||
+      chat.latestMessage.sender === appUser?._id
+    ) {
+      return false;
+    }
+    // jo bhi latestmessage aya hoga to uske readBy me agar me nhi hu yani same wala ne nhi message kiya hai
+    return !chat.latestMessage.readBy?.includes(appUser?._id);
+  };
+
   useEffect(() => {
     if (appUser?._id) {
       fetchChats();
@@ -33,35 +46,29 @@ export default function MessagesSidebar({
 
   useEffect(() => {
     if (!appUser?._id) return;
-
     const personalChannel = `user-${appUser._id}`;
     const channel = pusherClient.subscribe(personalChannel);
 
     channel.bind("sidebar-update", (data: any) => {
       setAllChats((prevChats) => {
-        // Chat dhundo array mein
         const chatExists = prevChats.find((c) => c._id === data.chatId);
 
         if (chatExists) {
-          // Purani list ko update karo
           const updatedList = prevChats.map((chat) => {
             if (chat._id === data.chatId) {
               return {
                 ...chat,
-                latestMessage: data.latestMessage,
+                latestMessage: data.latestMessage, // Isme 'readBy' array server se aayega
                 updatedAt: data.updatedAt,
               };
             }
             return chat;
           });
-
-          // Naye message wali chat ko TOP par lao
           return updatedList.sort(
             (a, b) =>
               new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
           );
         } else {
-          // Agar naya conversation hai jo sidebar mein nahi tha, toh refresh karlo
           fetchChats();
           return prevChats;
         }
@@ -73,6 +80,25 @@ export default function MessagesSidebar({
       channel.unbind_all();
     };
   }, [appUser?._id]);
+
+  const handleChatSelect = (chat: any) => {
+    setSelectedChat(chat);
+    // UI update: Locally mark as read taaki user ko refresh na karna pade
+    setAllChats((prev) =>
+      prev.map((c) => {
+        if (c._id === chat._id && c.latestMessage) {
+          return {
+            ...c,
+            latestMessage: {
+              ...c.latestMessage,
+              readBy: [...(c.latestMessage.readBy || []), appUser?._id],
+            },
+          };
+        }
+        return c;
+      })
+    );
+  };
 
   return (
     <div className="flex flex-col h-full w-full">
@@ -100,11 +126,12 @@ export default function MessagesSidebar({
           {allChats.map((chat) => {
             const otherUser = getOtherUser(chat.participants);
             const isOnline = onlineUsers.includes(otherUser?._id);
+            const isUnread = isChatUnread(chat);
 
             return (
               <div
                 key={chat._id}
-                onClick={() => setSelectedChat(chat)}
+                onClick={() => handleChatSelect(chat)}
                 className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all active:scale-95  ${
                   selectedChat?._id === chat._id
                     ? "border border-primary/50 shadow-sm shadow-primary/20"
@@ -154,15 +181,24 @@ export default function MessagesSidebar({
                     </span>
                   </div>
 
-                  <p
-                    className={`text-xs truncate ${
-                      selectedChat?._id === chat._id
-                        ? "opacity-80"
-                        : "text-muted-foreground"
-                    }`}
-                  >
-                    {chat.latestMessage?.content || "No messages yet"}
-                  </p>
+                  <div className="flex justify-between items-center gap-2">
+                    <p
+                      className={`text-xs truncate max-w-45 ${
+                        isUnread
+                          ? "text-foreground font-bold"
+                          : "text-muted-foreground font-normal"
+                      }`}
+                    >
+                      {/* Show "You: " prefix if sender is me */}
+                      {chat.latestMessage?.sender === appUser?._id && "You: "}
+                      {chat.latestMessage?.content || "No messages yet"}
+                    </p>
+
+                    {/* Unread Badge Indicator */}
+                    {isUnread && (
+                      <div className="w-2.5 h-2.5 rounded-full bg-primary shadow-sm shadow-primary/40 shrink-0 animate-in zoom-in duration-300" />
+                    )}
+                  </div>
                 </div>
               </div>
             );

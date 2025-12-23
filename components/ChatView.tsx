@@ -8,6 +8,8 @@ import {
   Paperclip,
   Send,
   ChevronLeft,
+  Check,
+  CheckCheck,
 } from "lucide-react";
 import { useAppUser } from "@/context/UserContext";
 import Image from "next/image";
@@ -18,11 +20,11 @@ import { pusherClient } from "@/lib/pusherClient";
 const ChatHeader = ({
   otherUser,
   onBack,
-  isOnline
+  isOnline,
 }: {
   otherUser: any;
   onBack: () => void;
-  isOnline: boolean
+  isOnline: boolean;
 }) => (
   <header className="h-16 border-b border-border flex items-center justify-between px-4 md:px-6 bg-background/50 backdrop-blur-md sticky top-0 z-10">
     <div className="flex items-center gap-2 md:gap-4">
@@ -104,6 +106,62 @@ export default function ChatView({
   // Check if this specific user is online
   const isOnline = onlineUsers.includes(otherUser?._id);
 
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !activeChat?._id || !appUser?._id) return;
+
+    const contentToSend = newMessage; // Store content
+    setNewMessage(""); // Clear immediately
+
+    const tempId = Date.now().toString();
+    const optimisticMsg = {
+      _id: tempId,
+      content: contentToSend,
+      sender: { _id: appUser._id, name: appUser.name, avatar: appUser.avatar },
+      chat: activeChat._id,
+      readBy: [],
+      createdAt: new Date().toISOString(),
+      isSending: true,
+      error: false,
+    };
+
+    setMessages((prev) => [...prev, optimisticMsg]);
+
+    try {
+      // Use contentToSend here
+      const res = await axios.post("/api/messages/send", {
+        chatId: activeChat._id,
+        senderId: appUser._id,
+        content: contentToSend,
+      });
+
+      if (res.data.success) {
+        const realMsg = res.data.data;
+        setMessages((prev) =>
+          prev.map((m) =>
+            m._id === tempId ? { ...realMsg, isSending: false } : m
+          )
+        );
+      }
+    } catch (error) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m._id === tempId ? { ...m, isSending: false, error: true } : m
+        )
+      );
+    }
+  };
+  const markMessagesAsRead = async () => {
+    if (!activeChat?._id || !appUser?._id) return;
+    try {
+      await axios.post("/api/messages/read", {
+        chatId: activeChat._id,
+        userId: appUser._id,
+      });
+    } catch (error) {
+      console.error("Failed to mark read", error);
+    }
+  };
+
   // 1. Fetch Messages from API (Initial Load)
   useEffect(() => {
     const fetchMessages = async () => {
@@ -114,6 +172,7 @@ export default function ChatView({
         if (res.data.success) {
           // Check if response is res.data.data or res.data.messages based on your API
           setMessages(res.data.data || []);
+          markMessagesAsRead(); // TODO: scalable hai ya nhi check krna hoga kyuki yeh to har inititla fetch pe read wali req krega
         }
       } catch (error) {
         console.error("Fetch error:", error);
@@ -126,57 +185,60 @@ export default function ChatView({
 
   // 2. Pusher Real-time Listener
   useEffect(() => {
-    if (!activeChat?._id) return;
+    if (!activeChat?._id || !appUser?._id) return;
 
     const channelName = `chat-${activeChat._id}`;
     const channel = pusherClient.subscribe(channelName);
 
+    // A: NewMessage Listener
     channel.bind("incoming-message", (incomingMsg: any) => {
+      const isFromMe =
+        incomingMsg.sender._id === appUser._id ||
+        incomingMsg.sender === appUser._id;
+
+      if (isFromMe) return;
+
       setMessages((prev) => {
-        // Prevent duplicate if the message is already in the state (sent by current user)
+        // Duplicate check (just in case)
         const exists = prev.find((m) => m._id === incomingMsg._id);
         if (exists) return prev;
+
+        // Agar chat open hai aur dusre ka msg aaya, mark as read
+        markMessagesAsRead();
+
         return [...prev, incomingMsg];
       });
     });
 
+    // B: Messages Read Listener (Tick update)
+    channel.bind(
+      "messages-read",
+      (data: { chatId: string; readerId: string }) => {
+        // Agar reader main nahi hoon (yani dusre ne padha hai), tabhi tick update karo
+        if (data.readerId !== appUser._id) {
+          setMessages((prev) =>
+            prev.map((msg) => {
+              if (!msg.readBy.includes(data.readerId)) {
+                return { ...msg, readBy: [...msg.readBy, data.readerId] };
+              }
+              return msg;
+            })
+          );
+        }
+      }
+    );
+
     return () => {
       pusherClient.unsubscribe(channelName);
       channel.unbind("incoming-message");
+      channel.unbind("messages-read");
     };
-  }, [activeChat?._id]);
+  }, [activeChat?._id, appUser?._id]);
 
   // 3. Auto-scroll to bottom
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-
-  // 4. Send Message Logic
-  const handleSendMessage = async () => {
-    if (!newMessage.trim() || !activeChat?._id) return;
-
-    const messageData = {
-      chatId: activeChat._id,
-      senderId: appUser?._id,
-      content: newMessage,
-    };
-
-    try {
-      setNewMessage(""); // Optimistic UI clear
-      const res = await axios.post("/api/messages/send", messageData);
-
-      if (res.data.success) {
-        const sentMsg = res.data.data || res.data.message;
-        setMessages((prev) => {
-          const exists = prev.find((m) => m._id === sentMsg._id);
-          if (exists) return prev;
-          return [...prev, sentMsg];
-        });
-      }
-    } catch (error) {
-      console.error("Send error:", error);
-    }
-  };
 
   if (!activeChat) {
     return (
@@ -193,7 +255,7 @@ export default function ChatView({
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden">
-      <ChatHeader otherUser={otherUser} onBack={onBack} isOnline={isOnline}/>
+      <ChatHeader otherUser={otherUser} onBack={onBack} isOnline={isOnline} />
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-slate-50/30 dark:bg-zinc-950/30 custom-scrollbar">
@@ -205,6 +267,10 @@ export default function ChatView({
           messages.map((msg, index) => {
             const isMe =
               msg.sender._id === appUser?._id || msg.sender === appUser?._id;
+
+            const isRead = msg.readBy.some(
+              (id: string) => id === otherUser?._id
+            );
 
             return (
               <div
@@ -226,22 +292,62 @@ export default function ChatView({
 
                 {/* Bubble */}
                 <div
-                  className={`p-4 rounded-2xl text-sm shadow-sm border ${
+                  className={`p-4 rounded-2xl text-sm shadow-sm border relative group ${
                     isMe
-                      ? "bg-primary text-primary-foreground rounded-br-none border-primary/20 shadow-primary/10"
+                      ? "bg-primary text-primary-foreground rounded-br-none border-primary/20"
                       : "bg-secondary/80 text-foreground rounded-bl-none border-border/50"
                   }`}
                 >
                   {msg.content}
+
                   <div
-                    className={`text-[9px] mt-1 opacity-50 text-right ${
-                      isMe ? "text-primary-foreground" : "text-muted-foreground"
+                    className={`text-[9px] mt-1 flex items-center justify-end gap-1 opacity-70 ${
+                      isMe
+                        ? "text-primary-foreground/80"
+                        : "text-muted-foreground"
                     }`}
                   >
-                    {new Date(msg.createdAt).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {/* Time */}
+                    <span>
+                      {new Date(msg.createdAt).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+
+                    {/* TICKS / Status Area */}
+                    {isMe && (
+                      <div className="flex items-center gap-1">
+                        {msg.error ? (
+                          // ERROR STATE: Chhota red exclamation ya retry icon
+                          <span className="text-red-400 text-[10px] font-bold">
+                            Failed
+                          </span>
+                        ) : msg.isSending ? (
+                          // SENDING STATE: Chhota spinner ya clock
+                          <div className="w-3 h-3 border-2 border-primary-foreground/30 border-t-primary-foreground animate-spin rounded-full" />
+                        ) : (
+                          // SENT/READ STATE: Aapka purana tick logic
+                          <span
+                            className={
+                              isRead
+                                ? "text-blue-200"
+                                : "text-primary-foreground/60"
+                            }
+                          >
+                            {isRead ? (
+                              <CheckCheck
+                                size={14}
+                                strokeWidth={3}
+                                className="text-blue-400"
+                              />
+                            ) : (
+                              <Check size={14} strokeWidth={3} />
+                            )}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

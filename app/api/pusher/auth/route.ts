@@ -1,3 +1,4 @@
+// /api/pusher/auth
 import { pusherServer } from "@/lib/pusherServer";
 import { NextResponse } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
