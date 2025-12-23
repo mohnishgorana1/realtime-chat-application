@@ -1,3 +1,4 @@
+// /api/messages/send
 import connectDB from "@/lib/config/db";
 import { Message } from "@/models/message.model";
 import { Chat } from "@/models/chat.model";
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
     });
 
     // 2. Chat model mein 'latestMessage' update karein
-    await Chat.findByIdAndUpdate(chatId, {
+    const updatedChat = await Chat.findByIdAndUpdate(chatId, {
       latestMessage: newMessage._id,
     });
 
@@ -36,7 +37,24 @@ export async function POST(req: Request) {
     // 1. Channel Name: Chat ID (Unique for this conversation)
     // 2. Event Name: "incoming-message"
     // 3. Data: Naya message object
-    await pusherServer.trigger(`chat-${chatId}`, "incoming-message", populatedMessage);
+    await pusherServer.trigger(
+      `chat-${chatId}`,
+      "incoming-message",
+      populatedMessage
+    );
+
+    updatedChat.participants.forEach(async (participant: any) => {
+      await pusherServer.trigger(
+        `user-${participant._id}`, // Har user ka apna private channel
+        "sidebar-update",
+        {
+          chatId: chatId,
+          latestMessage: populatedMessage,
+          updatedAt: new Date(),
+        }
+      );
+    });
+
 
     return NextResponse.json(
       {

@@ -1,3 +1,4 @@
+// /api/chats
 import connectDB from "@/lib/config/db";
 import { Chat } from "@/models/chat.model";
 import { Message } from "@/models/message.model";

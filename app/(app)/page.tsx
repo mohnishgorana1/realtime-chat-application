@@ -8,6 +8,7 @@ async function HomePage() {
     <main className="min-h-screen bg-background text-foreground">
       <HomeClient />
     </main>
+    
   )
 }
 

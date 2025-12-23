@@ -18,9 +18,11 @@ import { pusherClient } from "@/lib/pusherClient";
 const ChatHeader = ({
   otherUser,
   onBack,
+  isOnline
 }: {
   otherUser: any;
   onBack: () => void;
+  isOnline: boolean
 }) => (
   <header className="h-16 border-b border-border flex items-center justify-between px-4 md:px-6 bg-background/50 backdrop-blur-md sticky top-0 z-10">
     <div className="flex items-center gap-2 md:gap-4">
@@ -49,9 +51,20 @@ const ChatHeader = ({
           <h3 className="font-bold text-sm md:text-base leading-none truncate uppercase tracking-tight">
             {otherUser?.name || "Select a Chat"}
           </h3>
-          <span className="text-[10px] text-green-500 font-medium animate-pulse">
-            Online
-          </span>
+          <div className="flex items-center gap-1.5 mt-1">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isOnline ? "bg-green-500 animate-pulse" : "bg-zinc-500"
+              }`}
+            />
+            <span
+              className={`text-[10px] font-medium ${
+                isOnline ? "text-green-500" : "text-zinc-500"
+              }`}
+            >
+              {isOnline ? "Online" : "Offline"}
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -78,7 +91,7 @@ export default function ChatView({
   activeChat: any;
   onBack: () => void;
 }) {
-  const { appUser } = useAppUser();
+  const { appUser, onlineUsers } = useAppUser();
 
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -88,6 +101,8 @@ export default function ChatView({
   const otherUser = activeChat?.participants?.find(
     (p: any) => p._id !== appUser?._id
   );
+  // Check if this specific user is online
+  const isOnline = onlineUsers.includes(otherUser?._id);
 
   // 1. Fetch Messages from API (Initial Load)
   useEffect(() => {
@@ -149,13 +164,13 @@ export default function ChatView({
     try {
       setNewMessage(""); // Optimistic UI clear
       const res = await axios.post("/api/messages/send", messageData);
-      
+
       if (res.data.success) {
         const sentMsg = res.data.data || res.data.message;
         setMessages((prev) => {
-           const exists = prev.find((m) => m._id === sentMsg._id);
-           if (exists) return prev;
-           return [...prev, sentMsg];
+          const exists = prev.find((m) => m._id === sentMsg._id);
+          if (exists) return prev;
+          return [...prev, sentMsg];
         });
       }
     } catch (error) {
@@ -178,7 +193,7 @@ export default function ChatView({
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden">
-      <ChatHeader otherUser={otherUser} onBack={onBack} />
+      <ChatHeader otherUser={otherUser} onBack={onBack} isOnline={isOnline}/>
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-slate-50/30 dark:bg-zinc-950/30 custom-scrollbar">
@@ -188,8 +203,9 @@ export default function ChatView({
           </div>
         ) : (
           messages.map((msg, index) => {
-            const isMe = msg.sender._id === appUser?._id || msg.sender === appUser?._id;
-            
+            const isMe =
+              msg.sender._id === appUser?._id || msg.sender === appUser?._id;
+
             return (
               <div
                 key={msg._id || index}
