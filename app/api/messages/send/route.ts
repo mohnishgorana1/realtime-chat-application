@@ -38,7 +38,7 @@ export async function POST(req: Request) {
     // 2. Event Name: "incoming-message"
     // 3. Data: Naya message object
     await pusherServer.trigger(
-      `chat-${chatId}`,
+      `private-chat-${chatId}`,
       "incoming-message",
       populatedMessage
     );

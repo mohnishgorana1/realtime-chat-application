@@ -100,6 +100,10 @@ export default function ChatView({
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // typing indicators
+  const [isOtherUserTyping, setIsOtherUserTyping] = useState(false);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const otherUser = activeChat?.participants?.find(
     (p: any) => p._id !== appUser?._id
   );
@@ -183,59 +187,104 @@ export default function ChatView({
     fetchMessages();
   }, [activeChat?._id]);
 
-  // 2. Pusher Real-time Listener
+  // 2. Pusher Real-time Listener (Combined for Messages + Typing)
   useEffect(() => {
     if (!activeChat?._id || !appUser?._id) return;
 
-    const channelName = `chat-${activeChat._id}`;
+    const channelName = `private-chat-${activeChat._id}`;
     const channel = pusherClient.subscribe(channelName);
 
-    // A: NewMessage Listener
+    // A: Naya message aane par
     channel.bind("incoming-message", (incomingMsg: any) => {
       const isFromMe =
         incomingMsg.sender._id === appUser._id ||
         incomingMsg.sender === appUser._id;
-
       if (isFromMe) return;
 
       setMessages((prev) => {
-        // Duplicate check (just in case)
-        const exists = prev.find((m) => m._id === incomingMsg._id);
-        if (exists) return prev;
-
-        // Agar chat open hai aur dusre ka msg aaya, mark as read
+        if (prev.find((m) => m._id === incomingMsg._id)) return prev;
         markMessagesAsRead();
-
         return [...prev, incomingMsg];
       });
     });
 
-    // B: Messages Read Listener (Tick update)
-    channel.bind(
-      "messages-read",
-      (data: { chatId: string; readerId: string }) => {
-        // Agar reader main nahi hoon (yani dusre ne padha hai), tabhi tick update karo
-        if (data.readerId !== appUser._id) {
-          setMessages((prev) =>
-            prev.map((msg) => {
-              if (!msg.readBy.includes(data.readerId)) {
-                return { ...msg, readBy: [...msg.readBy, data.readerId] };
-              }
-              return msg;
-            })
-          );
-        }
+    // B: Tick update (Read status)
+    channel.bind("messages-read", (data: { readerId: string }) => {
+      if (data.readerId !== appUser._id) {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            !msg.readBy.includes(data.readerId)
+              ? { ...msg, readBy: [...msg.readBy, data.readerId] }
+              : msg
+          )
+        );
       }
-    );
+    });
+
+    // C: Dusra user jab type kare (Typing Indicator ON)
+    channel.bind("client-typing", (data: { userId: string }) => {
+      if (data.userId !== appUser._id) setIsOtherUserTyping(true);
+    });
+
+    // D: Dusra user jab typing band kare (Typing Indicator OFF)
+    channel.bind("client-stop-typing", (data: { userId: string }) => {
+      if (data.userId !== appUser._id) setIsOtherUserTyping(false);
+    });
 
     return () => {
+      channel.unbind_all();
       pusherClient.unsubscribe(channelName);
-      channel.unbind("incoming-message");
-      channel.unbind("messages-read");
     };
   }, [activeChat?._id, appUser?._id]);
 
-  // 3. Auto-scroll to bottom
+  // 2. Typing TRIGGER Logic
+  useEffect(() => {
+    if (!activeChat?._id || !appUser?._id || !newMessage) return;
+
+    const channelName = `private-chat-${activeChat._id}`;
+    const channel = pusherClient.subscribe(channelName);
+
+    if (newMessage.length > 0) {
+      // Send trigger
+      channel.trigger("client-typing", { userId: appUser._id });
+
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+
+      typingTimeoutRef.current = setTimeout(() => {
+        channel.trigger("client-stop-typing", { userId: appUser._id });
+      }, 2000);
+    }
+  }, [newMessage]); // Only watch newMessage here
+
+  // 4 Typing Indicator
+  useEffect(() => {
+    if (!activeChat?._id || !appUser?._id) return;
+
+    const channelName = `private-chat-${activeChat._id}`;
+    const channel = pusherClient.subscribe(channelName);
+
+    if (newMessage.trim().length > 0) {
+      // Dusre ko batao main type kar raha hoon
+      channel.trigger("client-typing", { userId: appUser._id });
+
+      // Stop typing timeout
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+
+      typingTimeoutRef.current = setTimeout(() => {
+        channel.trigger("client-stop-typing", { userId: appUser._id });
+      }, 2000);
+    } else {
+      // Agar text clear kar diya, toh turant stop-typing bhej do
+      channel.trigger("client-stop-typing", { userId: appUser._id });
+    }
+
+    // Safai (Cleanup)
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    };
+  }, [newMessage, activeChat?._id]);
+
+  // 4. Auto-scroll to bottom
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -354,7 +403,23 @@ export default function ChatView({
             );
           })
         )}
+        {isOtherUserTyping && (
+          <div className="flex gap-3 max-w-[85%] items-end animate-in fade-in slide-in-from-bottom-2 duration-300">
+            {/* Samne wale ka avatar typing ke saath */}
+            <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-[10px] font-bold border border-border shrink-0">
+              {otherUser?.name?.[0]}
+            </div>
+
+            {/* Typing dots bubble */}
+            <div className="bg-secondary/50 p-3.5 rounded-2xl rounded-bl-none border border-border/50 flex gap-1 items-center">
+              <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+              <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+              <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce"></span>
+            </div>
+          </div>
+        )}
         <div ref={scrollRef} />
+        {/* Typing Indicator Bubble */}
       </div>
 
       {/* Message input */}
