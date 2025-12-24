@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useLayoutEffect } from "react";
 import {
   Phone,
   Video,
@@ -10,13 +10,14 @@ import {
   ChevronLeft,
   Check,
   CheckCheck,
+  Loader2, // Icon for loading spinner
 } from "lucide-react";
 import { useAppUser } from "@/context/UserContext";
 import Image from "next/image";
 import axios from "axios";
 import { pusherClient } from "@/lib/pusherClient";
 
-// --- Sub-Component: Chat Header ---
+// ... [ChatHeader component remains exactly the same] ...
 const ChatHeader = ({
   otherUser,
   onBack,
@@ -85,7 +86,6 @@ const ChatHeader = ({
   </header>
 );
 
-// --- Main ChatView Component ---
 export default function ChatView({
   activeChat,
   onBack,
@@ -97,8 +97,19 @@ export default function ChatView({
 
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState("");
-  const [loading, setLoading] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Pagination States
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(false);
+
+  // Refs
+  const scrollRef = useRef<HTMLDivElement>(null); // For auto-scroll bottom
+  const containerRef = useRef<HTMLDivElement>(null); // For scroll position calculation
+
+  // To preserve scroll position
+  const [prevScrollHeight, setPrevScrollHeight] = useState<number | null>(null);
 
   // typing indicators
   const [isOtherUserTyping, setIsOtherUserTyping] = useState(false);
@@ -107,14 +118,104 @@ export default function ChatView({
   const otherUser = activeChat?.participants?.find(
     (p: any) => p._id !== appUser?._id
   );
-  // Check if this specific user is online
   const isOnline = onlineUsers.includes(otherUser?._id);
+
+  // --- Reset State when Chat Changes ---
+  useEffect(() => {
+    setMessages([]);
+    setPage(1);
+    setHasMore(true);
+    setPrevScrollHeight(null);
+  }, [activeChat?._id]);
+
+  // --- 1. Fetch Messages (Handles both Initial and Pagination) ---
+  const fetchMessages = async (currentPage: number, isLoadMore = false) => {
+    if (!activeChat?._id) return;
+
+    if (isLoadMore) setLoadingMore(true);
+    else setInitialLoading(true);
+
+    try {
+      const res = await axios.get(
+        `/api/messages/${activeChat._id}?page=${currentPage}&limit=10`
+      );
+
+      if (res.data.success) {
+        const fetchedMessages = res.data.data;
+        const serverHasMore = res.data.pagination.hasMore;
+
+        setHasMore(serverHasMore);
+
+        if (isLoadMore) {
+          // PAGINATION: Purane messages ko upar append karo
+          setMessages((prev) => [...fetchedMessages, ...prev]);
+        } else {
+          // INITIAL LOAD: Set messages directly
+          setMessages(fetchedMessages);
+        }
+      }
+    } catch (error) {
+      console.error("Fetch error:", error);
+    } finally {
+      if (isLoadMore) setLoadingMore(false);
+      else setInitialLoading(false);
+    }
+  };
+
+  // --- Initial Load Trigger ---
+  useEffect(() => {
+    if (activeChat?._id) {
+      fetchMessages(1, false);
+    }
+  }, [activeChat?._id]);
+
+  // --- Handle Scroll (Load More Logic) ---
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight } = e.currentTarget;
+
+    // Agar user top par pohunch gaya (scrollTop === 0) aur messages bache hain
+    if (scrollTop === 0 && hasMore && !loadingMore && !initialLoading) {
+      // Current scroll height save kar lo taki jump na ho
+      setPrevScrollHeight(scrollHeight);
+      const nextPage = page + 1;
+      setPage(nextPage);
+      fetchMessages(nextPage, true);
+    }
+  };
+
+  // --- Scroll Retention Logic (Crucial for "Niche se upar na bhage") ---
+  useLayoutEffect(() => {
+    // Sirf tab chalao jab humne 'Load More' kiya ho (prevScrollHeight exist karta ho)
+    if (prevScrollHeight && containerRef.current) {
+      const newScrollHeight = containerRef.current.scrollHeight;
+      const heightDifference = newScrollHeight - prevScrollHeight;
+
+      // User ko wahi position par rakho jaha wo tha
+      containerRef.current.scrollTop = heightDifference;
+
+      // Reset ref
+      setPrevScrollHeight(null);
+    } else if (
+      !prevScrollHeight &&
+      !loadingMore &&
+      !initialLoading &&
+      messages.length > 0 &&
+      page === 1
+    ) {
+      // Only scroll to bottom on INITIAL load or new message sent, not on pagination
+      scrollRef.current?.scrollIntoView({ behavior: "auto" });
+    }
+  }, [messages, loadingMore, initialLoading]);
+  // Dependency explanation: Jab messages update honge, UI re-render hoga, tab hum scroll adjust karenge.
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !activeChat?._id || !appUser?._id) return;
 
-    const contentToSend = newMessage; // Store content
-    setNewMessage(""); // Clear immediately
+    const contentToSend = newMessage;
+    setNewMessage("");
+
+    // Reset pagination logic slightly to ensure flow works?
+    // Usually sending a message implies we are at the bottom.
 
     const tempId = Date.now().toString();
     const optimisticMsg = {
@@ -129,9 +230,13 @@ export default function ChatView({
     };
 
     setMessages((prev) => [...prev, optimisticMsg]);
+    // Force scroll bottom on send
+    setTimeout(
+      () => scrollRef.current?.scrollIntoView({ behavior: "smooth" }),
+      10
+    );
 
     try {
-      // Use contentToSend here
       const res = await axios.post("/api/messages/send", {
         chatId: activeChat._id,
         senderId: appUser._id,
@@ -154,6 +259,8 @@ export default function ChatView({
       );
     }
   };
+
+  // --- Read Status API Call ---
   const markMessagesAsRead = async () => {
     if (!activeChat?._id || !appUser?._id) return;
     try {
@@ -166,35 +273,12 @@ export default function ChatView({
     }
   };
 
-  // 1. Fetch Messages from API (Initial Load)
-  useEffect(() => {
-    const fetchMessages = async () => {
-      if (!activeChat?._id) return;
-      setLoading(true);
-      try {
-        const res = await axios.get(`/api/messages/${activeChat._id}`);
-        if (res.data.success) {
-          // Check if response is res.data.data or res.data.messages based on your API
-          setMessages(res.data.data || []);
-          markMessagesAsRead(); // TODO: scalable hai ya nhi check krna hoga kyuki yeh to har inititla fetch pe read wali req krega
-        }
-      } catch (error) {
-        console.error("Fetch error:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchMessages();
-  }, [activeChat?._id]);
-
-  // 2. Pusher Real-time Listener (Combined for Messages + Typing)
+  // --- Pusher Setup (Same as before) ---
   useEffect(() => {
     if (!activeChat?._id || !appUser?._id) return;
-
     const channelName = `private-chat-${activeChat._id}`;
     const channel = pusherClient.subscribe(channelName);
 
-    // A: Naya message aane par
     channel.bind("incoming-message", (incomingMsg: any) => {
       const isFromMe =
         incomingMsg.sender._id === appUser._id ||
@@ -206,9 +290,13 @@ export default function ChatView({
         markMessagesAsRead();
         return [...prev, incomingMsg];
       });
+      // New msg aane par niche scroll karo
+      setTimeout(
+        () => scrollRef.current?.scrollIntoView({ behavior: "smooth" }),
+        100
+      );
     });
 
-    // B: Tick update (Read status)
     channel.bind("messages-read", (data: { readerId: string }) => {
       if (data.readerId !== appUser._id) {
         setMessages((prev) =>
@@ -221,12 +309,10 @@ export default function ChatView({
       }
     });
 
-    // C: Dusra user jab type kare (Typing Indicator ON)
     channel.bind("client-typing", (data: { userId: string }) => {
       if (data.userId !== appUser._id) setIsOtherUserTyping(true);
     });
 
-    // D: Dusra user jab typing band kare (Typing Indicator OFF)
     channel.bind("client-stop-typing", (data: { userId: string }) => {
       if (data.userId !== appUser._id) setIsOtherUserTyping(false);
     });
@@ -237,57 +323,20 @@ export default function ChatView({
     };
   }, [activeChat?._id, appUser?._id]);
 
-  // 2. Typing TRIGGER Logic
+  // Typing Trigger Logic
   useEffect(() => {
     if (!activeChat?._id || !appUser?._id || !newMessage) return;
-
     const channelName = `private-chat-${activeChat._id}`;
     const channel = pusherClient.subscribe(channelName);
 
     if (newMessage.length > 0) {
-      // Send trigger
       channel.trigger("client-typing", { userId: appUser._id });
-
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-
       typingTimeoutRef.current = setTimeout(() => {
         channel.trigger("client-stop-typing", { userId: appUser._id });
       }, 2000);
     }
-  }, [newMessage]); // Only watch newMessage here
-
-  // 4 Typing Indicator
-  useEffect(() => {
-    if (!activeChat?._id || !appUser?._id) return;
-
-    const channelName = `private-chat-${activeChat._id}`;
-    const channel = pusherClient.subscribe(channelName);
-
-    if (newMessage.trim().length > 0) {
-      // Dusre ko batao main type kar raha hoon
-      channel.trigger("client-typing", { userId: appUser._id });
-
-      // Stop typing timeout
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-
-      typingTimeoutRef.current = setTimeout(() => {
-        channel.trigger("client-stop-typing", { userId: appUser._id });
-      }, 2000);
-    } else {
-      // Agar text clear kar diya, toh turant stop-typing bhej do
-      channel.trigger("client-stop-typing", { userId: appUser._id });
-    }
-
-    // Safai (Cleanup)
-    return () => {
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    };
-  }, [newMessage, activeChat?._id]);
-
-  // 4. Auto-scroll to bottom
-  useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [newMessage]);
 
   if (!activeChat) {
     return (
@@ -307,8 +356,19 @@ export default function ChatView({
       <ChatHeader otherUser={otherUser} onBack={onBack} isOnline={isOnline} />
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-slate-50/30 dark:bg-zinc-950/30 custom-scrollbar">
-        {loading ? (
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-slate-50/30 dark:bg-zinc-950/30 custom-scrollbar"
+      >
+        {/* Loading More Spinner (Top) */}
+        {loadingMore && (
+          <div className="flex justify-center py-2">
+            <Loader2 className="animate-spin text-primary/50" size={20} />
+          </div>
+        )}
+
+        {initialLoading ? (
           <div className="flex justify-center items-center h-full opacity-30 text-xs uppercase tracking-tighter">
             Loading messages...
           </div>
@@ -368,15 +428,12 @@ export default function ChatView({
                     {isMe && (
                       <div className="flex items-center gap-1">
                         {msg.error ? (
-                          // ERROR STATE: Chhota red exclamation ya retry icon
                           <span className="text-red-400 text-[10px] font-bold">
                             Failed
                           </span>
                         ) : msg.isSending ? (
-                          // SENDING STATE: Chhota spinner ya clock
                           <div className="w-3 h-3 border-2 border-primary-foreground/30 border-t-primary-foreground animate-spin rounded-full" />
                         ) : (
-                          // SENT/READ STATE: Aapka purana tick logic
                           <span
                             className={
                               isRead
@@ -403,14 +460,13 @@ export default function ChatView({
             );
           })
         )}
+
+        {/* Typing Indicator */}
         {isOtherUserTyping && (
           <div className="flex gap-3 max-w-[85%] items-end animate-in fade-in slide-in-from-bottom-2 duration-300">
-            {/* Samne wale ka avatar typing ke saath */}
             <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-[10px] font-bold border border-border shrink-0">
               {otherUser?.name?.[0]}
             </div>
-
-            {/* Typing dots bubble */}
             <div className="bg-secondary/50 p-3.5 rounded-2xl rounded-bl-none border border-border/50 flex gap-1 items-center">
               <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
               <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
@@ -418,8 +474,9 @@ export default function ChatView({
             </div>
           </div>
         )}
+
+        {/* Invisible div for Auto Scroll Bottom */}
         <div ref={scrollRef} />
-        {/* Typing Indicator Bubble */}
       </div>
 
       {/* Message input */}
