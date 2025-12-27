@@ -17,11 +17,32 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "RealtimeChatApplication",
-  description: "",
-  // icons:{
-  //   icon: ""
-  // }
+  title: {
+    default: "RealtimeChat | Fast & Secure Messaging",
+    template: "%s | RealtimeChat",
+  },
+  description:
+    "A modern real-time chat application built with Next.js, Pusher, and MongoDB.",
+  keywords: ["chat app", "real-time messaging", "Next.js chat", "Pusher chat"],
+  authors: [{ name: "Your Name/Brand" }],
+  metadataBase: new URL("https://your-deployment-url.vercel.app"),
+  openGraph: {
+    title: "RealtimeChat Application",
+    description: "Chat with your friends in real-time with zero latency.",
+    url: "https://your-deployment-url.vercel.app",
+    siteName: "RealtimeChat",
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "RealtimeChat Application",
+    description: "Modern messaging experience.",
+  },
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

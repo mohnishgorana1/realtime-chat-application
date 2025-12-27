@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import {
@@ -10,9 +10,16 @@ import {
   Github,
   MessageCircle,
   LayoutDashboard,
+  CheckCircle2,
+  Plus,
+  Minus,
+  Globe,
+  Server,
+  Activity,
 } from "lucide-react";
 import { useAppUser } from "@/context/UserContext";
 
+// Animation Variants
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
@@ -24,13 +31,13 @@ const itemVariants = {
 };
 
 export default function HomeClient() {
-  const { appUser, loading } = useAppUser();
+  const { appUser } = useAppUser();
 
   return (
     <div className="flex flex-col gap-20 pb-20 overflow-hidden bg-background">
       {/* --- HERO SECTION --- */}
-      <section className="relative pt-20 pb-32 md:pt-32 px-4 text-center">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-200 h-200 bg-primary/15 blur-[120px] rounded-full opacity-50 pointer-events-none" />
+      <section className="relative pt-20 pb-10 md:pt-32 px-4 text-center">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-primary/10 blur-[120px] rounded-full opacity-50 pointer-events-none" />
 
         <motion.div
           variants={containerVariants}
@@ -49,21 +56,21 @@ export default function HomeClient() {
             </span>
             {appUser
               ? `Welcome back, ${appUser.name.split(" ")[0]}`
-              : "v0.1.0 is now live"}
+              : "v1.0 is now live"}
           </motion.div>
 
-          {/* Dynamic Heading */}
+          {/* Heading */}
           <motion.h1
             variants={itemVariants}
             className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-foreground leading-[1.1]"
           >
             {appUser ? "Ready to rejoin the" : "Connect Instantly."} <br />
-            <span className="text-transparent bg-clip-text bg-linear-to-r from-neutral-900 via-neutral-600 to-neutral-400 dark:from-white dark:via-neutral-300 dark:to-neutral-500">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-neutral-900 via-neutral-600 to-neutral-400 dark:from-white dark:via-neutral-300 dark:to-neutral-500">
               {appUser ? "Conversation?" : "Chat Seamlessly."}
             </span>
           </motion.h1>
 
-          {/* Dynamic Description */}
+          {/* Description */}
           <motion.p
             variants={itemVariants}
             className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto"
@@ -73,7 +80,7 @@ export default function HomeClient() {
               : "Experience the next generation of realtime communication. Secure groups, instant delivery, and a clean interface built for speed."}
           </motion.p>
 
-          {/* Dynamic Buttons */}
+          {/* Buttons */}
           <motion.div
             variants={itemVariants}
             className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4"
@@ -101,18 +108,91 @@ export default function HomeClient() {
         </motion.div>
       </section>
 
-      {/* --- FEATURES SECTION --- (Common for both) */}
+      {/* --- NEW SECTION: APP INTERFACE PREVIEW --- */}
+      <section className="px-4">
+        <div className="max-w-5xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 40, rotateX: 10 }}
+            whileInView={{ opacity: 1, y: 0, rotateX: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            className="relative rounded-xl bg-zinc-900 border border-zinc-800 shadow-2xl overflow-hidden aspect-[16/9] md:aspect-[21/9]"
+          >
+            {/* Mock Header */}
+            <div className="h-12 border-b border-zinc-800 bg-zinc-900/50 flex items-center px-4 gap-2">
+              <div className="flex gap-2">
+                <div className="w-3 h-3 rounded-full bg-red-500/80" />
+                <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
+                <div className="w-3 h-3 rounded-full bg-green-500/80" />
+              </div>
+              <div className="ml-4 h-6 w-64 bg-zinc-800 rounded-md opacity-50" />
+            </div>
+            {/* Mock Body */}
+            <div className="flex h-full">
+              {/* Sidebar */}
+              <div className="w-64 border-r border-zinc-800 hidden md:block p-4 space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center gap-3 opacity-60">
+                    <div className="w-8 h-8 rounded-full bg-zinc-800" />
+                    <div className="h-3 w-20 bg-zinc-800 rounded" />
+                  </div>
+                ))}
+              </div>
+              {/* Chat Area */}
+              <div className="flex-1 p-8 space-y-6 relative">
+                <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 via-transparent to-transparent pointer-events-none" />
+
+                {/* Message 1 */}
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="flex gap-4 max-w-md"
+                >
+                  <div className="w-10 h-10 rounded-full bg-zinc-700 shrink-0" />
+                  <div className="bg-zinc-800 p-4 rounded-2xl rounded-tl-none text-zinc-300 text-sm">
+                    Hey! Have you tried the new real-time features? 🚀
+                  </div>
+                </motion.div>
+
+                {/* Message 2 (Me) */}
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.6 }}
+                  className="flex gap-4 max-w-md ml-auto flex-row-reverse"
+                >
+                  <div className="w-10 h-10 rounded-full bg-primary shrink-0" />
+                  <div className="bg-primary/20 border border-primary/20 p-4 rounded-2xl rounded-tr-none text-white text-sm">
+                    Yes! The latency is incredible. It feels instantaneous.
+                  </div>
+                </motion.div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* --- FEATURES SECTION --- */}
       <section className="px-4">
         <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold mb-4">Why choose us?</h2>
+            <p className="text-muted-foreground">
+              Built for modern teams who demand speed.
+            </p>
+          </div>
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            initial="hidden"
+            whileInView="visible"
             viewport={{ once: true }}
+            variants={containerVariants}
             className="grid grid-cols-1 md:grid-cols-3 gap-8"
           >
             {features.map((feature, idx) => (
               <motion.div
                 key={idx}
+                variants={itemVariants}
                 whileHover={{ y: -5 }}
                 className="p-6 rounded-3xl bg-card border border-border shadow-sm hover:shadow-xl hover:border-primary/50 transition-all duration-300 group"
               >
@@ -131,19 +211,49 @@ export default function HomeClient() {
         </div>
       </section>
 
+      {/* --- NEW SECTION: STATS --- */}
+      <section className="py-20 bg-primary/5 border-y border-border/50">
+        <div className="max-w-6xl mx-auto px-4">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+            variants={containerVariants}
+            className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center"
+          >
+            {[
+              { label: "Active Users", value: "10k+", icon: Users },
+              { label: "Messages Sent", value: "2M+", icon: MessageCircle },
+              { label: "Uptime", value: "99.9%", icon: Server },
+              { label: "Countries", value: "150+", icon: Globe },
+            ].map((stat, i) => (
+              <motion.div key={i} variants={itemVariants} className="space-y-2">
+                <div className="mx-auto w-10 h-10 mb-4 bg-background rounded-full flex items-center justify-center text-primary shadow-sm">
+                  <stat.icon size={20} />
+                </div>
+                <h3 className="text-4xl font-extrabold text-foreground tracking-tight">
+                  {stat.value}
+                </h3>
+                <p className="text-sm text-muted-foreground uppercase tracking-wider font-medium">
+                  {stat.label}
+                </p>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
       {/* --- CONDITIONAL CTA SECTION --- */}
       <AnimatePresence>
         {!appUser && (
-          <section className="px-4 mb-20">
+          <section className="px-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               whileInView={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
               viewport={{ once: true }}
               className="max-w-4xl mx-auto text-center"
             >
               <div className="bg-gradient-to-br from-blue-600 to-purple-700 rounded-3xl p-8 md:p-16 text-white shadow-2xl relative overflow-hidden">
-                {/* Decorative Circles */}
                 <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
                 <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-black/10 rounded-full blur-3xl" />
 
@@ -159,7 +269,7 @@ export default function HomeClient() {
                   card required, just sign in and chat.
                 </p>
                 <Link href="/sign-in" className="relative z-10">
-                  <button className="bg-white text-blue-600 px-8 py-3 rounded-xl font-bold hover:bg-zinc-100 transition-colors shadow-xl active:scale-95">
+                  <button className="bg-white text-blue-600 px-8 py-3 rounded-xl font-bold hover:bg-zinc-100 transition-colors shadow-xl active:scale-95 cursor-pointer">
                     Create Free Account
                   </button>
                 </Link>
@@ -169,6 +279,7 @@ export default function HomeClient() {
         )}
       </AnimatePresence>
 
+      {/* --- STEPS SECTION --- */}
       <section className="px-4 py-10 bg-secondary/20 rounded-[3rem] mx-4 border border-border/50">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
@@ -181,7 +292,6 @@ export default function HomeClient() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative">
-            {/* Desktop Connector Line */}
             <div className="hidden md:block absolute top-1/2 left-0 w-full h-0.5 bg-border -translate-y-12 z-0" />
 
             {[
@@ -206,6 +316,7 @@ export default function HomeClient() {
                 initial={{ opacity: 0, scale: 0.9 }}
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
+                transition={{ delay: i * 0.2 }}
                 className="relative z-10 text-center space-y-4"
               >
                 <div className="w-16 h-16 bg-primary text-primary-foreground rounded-2xl flex items-center justify-center text-2xl font-black mx-auto shadow-xl shadow-primary/20">
@@ -219,10 +330,37 @@ export default function HomeClient() {
         </div>
       </section>
 
+      {/* --- NEW SECTION: FAQ --- */}
+      <section className="px-4 py-20">
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold">Frequently Asked Questions</h2>
+          </div>
+          <div className="space-y-4">
+            {[
+              {
+                q: "Is this chat application free?",
+                a: "Yes! You can use all core features including unlimited messages and groups completely for free.",
+              },
+              {
+                q: "Can I use it on mobile?",
+                a: "Absolutely. The application is fully responsive and works perfectly on iOS, Android, and tablets.",
+              },
+              {
+                q: "Do you support file sharing?",
+                a: "Currently, we support text and emoji messaging. File sharing and image uploads are coming in the next update (v2.0).",
+              },
+            ].map((faq, i) => (
+              <FaqItem key={i} question={faq.q} answer={faq.a} />
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* --- TESTIMONIALS SECTION --- */}
       <section className="px-4">
         <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
             <div className="space-y-6">
               <h2 className="text-3xl md:text-5xl font-bold leading-tight">
                 What our{" "}
@@ -233,6 +371,17 @@ export default function HomeClient() {
                 Join 10,000+ developers and teams who communicate through our
                 platform daily.
               </p>
+              <div className="flex items-center gap-4 text-sm font-medium">
+                <div className="flex -space-x-3">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div
+                      key={i}
+                      className="w-10 h-10 rounded-full border-2 border-background bg-zinc-200 dark:bg-zinc-800"
+                    />
+                  ))}
+                </div>
+                <div>Rated 5.0/5 by teams</div>
+              </div>
             </div>
             <div className="grid gap-4">
               {[
@@ -246,17 +395,26 @@ export default function HomeClient() {
                   role: "Fullstack Dev",
                   text: "Latency is almost non-existent. The WebSocket implementation is rock solid.",
                 },
+                {
+                  name: "Michael Scott",
+                  role: "Regional Manager",
+                  text: "I love the way groups work. It's perfect for keeping my team organized.",
+                },
               ].map((t, i) => (
                 <motion.div
                   key={i}
+                  initial={{ opacity: 0, x: 20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
                   whileHover={{ x: 10 }}
+                  transition={{ delay: i * 0.1 }}
+                  viewport={{ once: true }}
                   className="p-6 bg-card border border-border rounded-2xl shadow-sm"
                 >
                   <p className="italic text-foreground/80 font-medium text-sm">
                     "{t.text}"
                   </p>
                   <div className="mt-4 flex items-center gap-3">
-                    <div className="w-10 h-10 bg-linear-to-tr from-primary to-purple-500 rounded-full" />
+                    <div className="w-10 h-10 bg-gradient-to-tr from-primary to-purple-500 rounded-full" />
                     <div>
                       <h4 className="font-bold text-sm">{t.name}</h4>
                       <p className="text-xs text-muted-foreground">{t.role}</p>
@@ -270,12 +428,12 @@ export default function HomeClient() {
       </section>
 
       {/* --- FOOTER SECTION --- */}
-      <footer className="px-4 mt-10">
+      <footer className="px-4 mt-20">
         <div className="max-w-6xl mx-auto border-t border-border pt-12 pb-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
             <div className="col-span-2 space-y-4">
               <div className="flex items-center gap-2">
-                <div className="bg-primary p-1.5 rounded-lg text-white">
+                <div className="p-1.5 rounded-lg bg-black text-white dark:bg-white dark:text-black">
                   <MessageCircle size={18} fill="currentColor" />
                 </div>
                 <span className="font-bold text-xl">
@@ -335,6 +493,48 @@ export default function HomeClient() {
     </div>
   );
 }
+
+// --- SUB-COMPONENTS ---
+
+const FaqItem = ({
+  question,
+  answer,
+}: {
+  question: string;
+  answer: string;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="border border-border rounded-xl bg-card overflow-hidden">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between p-4 text-left font-medium hover:bg-secondary/50 transition-colors"
+      >
+        {question}
+        {isOpen ? (
+          <Minus size={16} className="text-primary" />
+        ) : (
+          <Plus size={16} className="text-muted-foreground" />
+        )}
+      </button>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="p-4 pt-0 text-sm text-muted-foreground leading-relaxed">
+              {answer}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 
 const features = [
   {
