@@ -411,10 +411,10 @@ export default function HomeClient() {
                   className="p-6 bg-card border border-border rounded-2xl shadow-sm"
                 >
                   <p className="italic text-foreground/80 font-medium text-sm">
-                    "{t.text}"
+                    {`"${t.text}"`}
                   </p>
                   <div className="mt-4 flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gradient-to-tr from-primary to-purple-500 rounded-full" />
+                    <div className="w-10 h-10 bg-linear-to-tr from-primary to-purple-500 rounded-full" />
                     <div>
                       <h4 className="font-bold text-sm">{t.name}</h4>
                       <p className="text-xs text-muted-foreground">{t.role}</p>

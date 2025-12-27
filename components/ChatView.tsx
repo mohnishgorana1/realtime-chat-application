@@ -482,12 +482,12 @@ export default function ChatView({
       {/* Message input */}
       <div className="p-4 border-t border-border bg-background">
         <div className="max-w-4xl mx-auto flex items-end gap-2 bg-secondary/50 p-2 rounded-2xl border border-border focus-within:border-primary transition-all">
-          <button className="p-2 hover:text-primary transition-colors text-muted-foreground">
+          {/* <button className="p-2 hover:text-primary transition-colors text-muted-foreground">
             <Smile size={20} />
           </button>
           <button className="p-2 hover:text-primary transition-colors text-muted-foreground">
             <Paperclip size={20} />
-          </button>
+          </button> */}
           <textarea
             rows={1}
             value={newMessage}
@@ -499,7 +499,7 @@ export default function ChatView({
               }
             }}
             placeholder="Write a message..."
-            className="flex-1 bg-transparent border-none outline-none resize-none py-2 text-sm max-h-32"
+            className="flex-1 bg-transparent border-none outline-none resize-none py-2 px-2 text-sm max-h-32"
           />
           <button
             onClick={handleSendMessage}
